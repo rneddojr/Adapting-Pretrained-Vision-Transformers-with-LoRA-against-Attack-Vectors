@@ -80,6 +80,8 @@ Breaking down the dataset further and we can view the class distribution.
 | `--num_workers` | 4             | Data loading workers                  |
 | Learning Rate Schedule | StepLR (step=5, γ=0.1) | Reduces LR every 5 epochs |
 
+Finetuned models can be found on [Kaggle](https://www.kaggle.com/models/richardneddo/lora-as-a-flexible-framework/).
+
 ### Running Examples
 #### Train Clip Model
 python train.py --model swin --batch_size 96 --epochs 50

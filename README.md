@@ -62,29 +62,31 @@ Breaking down the dataset further and we can view the class distribution.
 | Model Name      |                                                     Architecture Type    | Pretrained Source | Input Size | Normalization Parameters |
 |-----------------                                                      |-------------------|-------------------|-----------|--------------------------|
 | [Swin Transformer](https://github.com/microsoft/Swin-Transformer)     | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
-| [ViT (Google)](https://github.com/google-research/vision_transformer) | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
-| [CLIP](https://github.com/openai/CLIP)                                | Vision Transformer | OpenAI            | 224x224    | CLIP-specific            |
-| [GoogleNet](https://github.com/conan7882/GoogLeNet-Inception)         | CNN                | TIMM              | 224x224    | ImageNet standard        |
-| [ResNet-50](https://github.com/Sudhandar/ResNet-50-model)             | CNN                | TIMM              | 224x224    | ImageNet standard        |
-| [ConvNeXt-Tiny](https://github.com/facebookresearch/ConvNeXt)         | CNN                | TIMM              | 224x224    | ImageNet standard        |
+| [Google ViT](https://github.com/google-research/vision_transformer) | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
+| [Dino V1](https://github.com/facebookresearch/dino)                                | Vision Transformer | TIMM            | 224x224    | ImageNet standard          |
+| [Yolo V11(Classification)](https://docs.ultralytics.com/models/yolo11/)         | CNN                | TIMM              | 224x224    | ImageNet standard        |
+| [ConvNeXt-Base](https://github.com/facebookresearch/ConvNeXt)         | CNN                | TIMM              | 224x224    | ImageNet standard        |
 
 ## Training
 
 | Parameter       | Default Value | Description                           |
 |-----------------|---------------|---------------------------------------|
+| `--data_root`   | ./Datasets/Adjust_Global_Dataset            | Images for train, val and test |
+| `--model`      | all            | Target model                       |
 | `--batch_size`  | 64            | Input batch size                      |
 | `--epochs`      | 50            | Training epochs                       |
 | `--lr`          | 1e-4          | Learning rate                         |
-| `--weight_decay`| 1e-4          | Optimizer weight decay                |
+| `--output_dir`| ./results          | Where to save results of training                |
 | `--seed`        | 42            | Random seed                           |
-| `--num_workers` | 4             | Data loading workers                  |
+| `--sources` | all             | Which subset to train on, see [Datasets]                  |
 | Learning Rate Schedule | StepLR (step=5, γ=0.1) | Reduces LR every 5 epochs |
 
 Finetuned models can be found on [Kaggle](https://www.kaggle.com/models/richardneddo/lora-as-a-flexible-framework/).
 
 ### Running Examples
 #### Train Clip Model
-python train.py --model swin --batch_size 96 --epochs 50
+python train.py --model swin dinov1 --batch_size 96 --epochs 24 --sources gtsrb
+Will train swin then dinov1 on GTSRB data.
 
 ## Adverserial Attacks
 

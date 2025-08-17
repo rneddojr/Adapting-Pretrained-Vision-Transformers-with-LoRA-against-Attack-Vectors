@@ -15,13 +15,18 @@ A unified dataset was developed from the following traffic and road sign dataset
 | [CURE-TSD](https://github.com/olivesgatech/CURE-TSD)                     | train, test      |         | USA |  Synthetic and real signs      |
 | [Roboflow Traffic Signs](https://universe.roboflow.com/usmanchaudhry622-gmail-com/traffic-and-road-signs)       | train, val, test |         | Global| Diverse dataset     |
 
+In order to have a more robust model, data was pulled from the "Train" split at a rate of 15% per split missing from a particular data subset prior to training.
+To facilitate cross-model validation and testing splits for train, test and validation were predefined in csv files to prevent data leakage in the form of Train-Test Contamination.
+
 The full unified dataset can be found: [Unified Dataset](https://drive.google.com/drive/folders/10_NTgU7khKPmxbTD26_RbU4eiQh7mQDl?usp=drive_link)
+The dataset after being restructured can be found: [Global Dataset](https://drive.google.com/drive/folders/1JV6WgSIYHnKQBHy7hzP_yTz7iSHfjjnc?usp=sharing)
+The "Global Dataset" is used for all training, testing and attack generation going forward.
 
 ---
 Breaking down the dataset further and we can view the class distribution.
 
 ### Unified Classes Table  
-| Unified Class         |  Number of Samples |  
+| Unified Class          |  Number of Samples |  
 |------------------------|---|  
 | speed_limit            |   |  
 | no_overtaking          |   |  

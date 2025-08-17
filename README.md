@@ -122,6 +122,9 @@ python whitebox_attacks.py \
 - **Characteristics**:
   - State-of-the-art ensemble attack
   - Parameter-free and adaptive
+
+Run prior:
+```pip install git+https://github.com/fra31/auto-attack```
 ```
 python auto_attack.py \
 --data_root ./processed \

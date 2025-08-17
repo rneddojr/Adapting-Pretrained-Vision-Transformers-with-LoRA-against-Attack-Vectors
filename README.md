@@ -85,7 +85,9 @@ Finetuned models can be found on [Kaggle](https://www.kaggle.com/models/richardn
 
 ### Running Examples
 #### Train Clip Model
+```
 python train.py --model swin dinov1 --batch_size 96 --epochs 24 --sources gtsrb
+```
 Will train swin then dinov1 on GTSRB data.
 
 ## Adverserial Attacks

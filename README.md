@@ -18,8 +18,10 @@ A unified dataset was developed from the following traffic and road sign dataset
 In order to have a more robust model, data was pulled from the "Train" split at a rate of 15% per split missing from a particular data subset prior to training.
 To facilitate cross-model validation and testing splits for train, test and validation were predefined in csv files to prevent data leakage in the form of Train-Test Contamination.
 
-The full unified dataset can be found: [Unified Dataset](https://drive.google.com/drive/folders/10_NTgU7khKPmxbTD26_RbU4eiQh7mQDl?usp=drive_link)
-The dataset after being restructured can be found: [Global Dataset](https://drive.google.com/drive/folders/1JV6WgSIYHnKQBHy7hzP_yTz7iSHfjjnc?usp=sharing)
+The full unified dataset can be found: [Unified Dataset](https://drive.google.com/drive/folders/10_NTgU7khKPmxbTD26_RbU4eiQh7mQDl?usp=drive_link).
+
+The dataset after being restructured can be found: [Global Dataset](https://drive.google.com/drive/folders/1JV6WgSIYHnKQBHy7hzP_yTz7iSHfjjnc?usp=sharing).
+
 The "Global Dataset" is used for all training, testing and attack generation going forward.
 
 ---

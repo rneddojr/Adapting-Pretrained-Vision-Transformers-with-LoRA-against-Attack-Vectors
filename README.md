@@ -108,14 +108,11 @@ Will train swin then dinov1 on GTSRB data.
 - **Sign Area Constraint**: Applies perturbations only to sign regions
 ```
 python whitebox_attacks.py \
---data_root ./processed \
---model swin \
---model_path ./results/swin/best_model.pth \
+--data_root ./path_to_top_of_dataset \
+--model google_vit \
+--source gtsrb \
+--model_path ./results/vit/xxxx_best_model.pth \
 --output_dir ./adv_attacks \
---epsilon 0.03 \
---pgd_alpha 0.01 \
---pgd_iters 40 \
---datasets train val test
 ```
 ### auto_attack.py
 - **Attack Type**: AutoAttack (Combination of 4 attacks)
@@ -127,12 +124,13 @@ Run prior:
 ```pip install git+https://github.com/fra31/auto-attack```
 ```
 python auto_attack.py \
---data_root ./processed \
---model swin \
---model_path ./results/swin/best_model.pth \
+--data_root ./path_to_top_of_dataset \
+--model dinov1 \
+--source gtsrb \
+--model_path ./results/dinov1/xxxx_best_model.pth \
 --output_dir ./adv_attacks \
---epsilon 0.03 \
---datasets test
+--epsilon 0.05 \
+--batch_size 16
 ```
 ### patch_attack.py
 - **Attack Type**: Physical adversarial patch
@@ -145,13 +143,15 @@ python auto_attack.py \
   - `--patch_sample_size`: Images for patch generation
 ```
 python patch_attack.py \
---data_root ./processed \
+--data_root ./path_to_top_of_dataset \
 --model swin \
---model_path ./results/swin/best_model.pth \
+--source lisa \
+--model_path ./results/swin/xxxx_best_model.pth \
 --output_dir ./adv_attacks \
 --patch_size 32 \
 --patch_sample_size 100 \
---datasets train val test
+--scale_min 0.2 \
+--scale_max 0.8 \
 ```
 ### rp2_attack.py
 - **Attack Type**: Robust physical perturbation

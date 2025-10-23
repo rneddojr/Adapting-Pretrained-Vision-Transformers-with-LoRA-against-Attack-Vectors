@@ -13,66 +13,48 @@ A unified dataset was developed from the following traffic and road sign dataset
 | [LISA Road Sign](https://git-disl.github.io/GTDLBench/datasets/lisa_traffic_sign_dataset/)               | train, val, test |         | USA | Variety of USA specific signs       |
 | [Mapillary Traffic Sign](https://www.mapillary.com/dataset/trafficsign)       | train, val, test |         | Global | Large and diverse dataset     |
 | [CURE-TSD](https://github.com/olivesgatech/CURE-TSD)                     | train, test      |         | USA |  Synthetic and real signs      |
-| [Roboflow Traffic Signs](https://universe.roboflow.com/usmanchaudhry622-gmail-com/traffic-and-road-signs)       | train, val, test |         | Global| Diverse dataset     |
 
-In order to have a more robust model, data was pulled from the "Train" split at a rate of 15% per split missing from a particular data subset prior to training.
+In order to have a more robust model, data was pulled from the "Train" split at a rate of 15% per split from a particular data subset prior to training.
 To facilitate cross-model validation and testing, splits for train, test and validation were predefined in csv files to prevent data leakage in the form of Train-Test Contamination.
-
-The full unified dataset can be found: [Unified Dataset](https://drive.google.com/drive/folders/10_NTgU7khKPmxbTD26_RbU4eiQh7mQDl?usp=drive_link).
-
-The dataset after being restructured can be found: [Global Dataset](https://drive.google.com/drive/folders/1JV6WgSIYHnKQBHy7hzP_yTz7iSHfjjnc?usp=sharing).
-
-The "Global Dataset" is used for all training, testing and attack generation going forward.
 
 ---
 Breaking down the dataset further and we can view the class distribution.
 
 ### Unified Classes Table  
-| Unified Class          |  Number of Samples |  
-|------------------------|---|  
-| speed_limit            |   |  
-| no_overtaking          |   |  
-| priority_road          |   |  
-| yield                  |   |  
-| stop                   |   |  
-| no_vehicles            |   |  
-| goods_vehicles         |   |  
-| no_entry               |   |  
-| curve                  |   |  
-| bump                   |   |  
-| slippery_road          |   |  
-| warning                |   |  
-| road_work              |   |  
-| pedestrian_crossing    |   |  
-| school_zone            |   |  
-| bicycle_crossing       |   |  
-| wild_animals           |   |  
-| no_left_turn           |   |  
-| no_right_turn          |   |  
-| directional            |   |  
-| keep_right             |   |  
-| keep_left              |   |  
-| roundabout             |   |  
-| ahead_only             |   |  
-| turn_left              |   |  
-| turn_right             |   |  
-| no_parking             |   |  
-| no_stopping            |   |  
-| parking                |   |  
-| bus_stop               |   |  
-| rest_area              |   |  
-| railway_crossing       |   |  
-| other                  |   |
+| Class            |  Number of Samples |  
+|------------------|------|  
+| ahead_only       | 1438  |
+| curve            | 2596  |
+| goods_vehicles   | 587   |
+| keep_left        | 1345  |
+| keep_right       | 2691  |
+| no_entry         | 2089  |
+| no_left_turn     | 1231  |
+| no_overtaking    | 1613  |
+| no_parking       | 3518  |
+| no_right_turn    | 1004  |
+| no_stopping      | 3079  |
+| no_u_turn        | 1297  |
+| parking          | 2690  |
+| priority_road    | 1657  |
+| roundabout       | 1827  |
+| speed_limit      | 14910  |
+| stop             | 2552  |
+| turn_left        | 2016  |
+| turn_right       | 2029  |
+| warning          | 2063  |
+| yield            | 4067  |
+ 
 
 ## Supported Models
 
-| Model Name      |                                                     Architecture Type    | Pretrained Source | Input Size | Normalization Parameters |
-|-----------------                                                      |-------------------|-------------------|-----------|--------------------------|
-| [Swin Transformer](https://github.com/microsoft/Swin-Transformer)     | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
-| [Google ViT](https://github.com/google-research/vision_transformer) | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
-| [Dino V1](https://github.com/facebookresearch/dino)                                | Vision Transformer | TIMM            | 224x224    | ImageNet standard          |
-| [Yolo V11(Classification)](https://docs.ultralytics.com/models/yolo11/)         | CNN                | TIMM              | 224x224    | ImageNet standard        |
-| [ConvNeXt-Base](https://github.com/facebookresearch/ConvNeXt)         | CNN                | TIMM              | 224x224    | ImageNet standard        |
+| Model Name      |                                                        Architecture Type    | Pretrained Source | Input Size | Normalization Parameters |
+|-----------------                                                        |-------------------|-------------------|-----------|--------------------------|
+| [Swin Transformer](https://github.com/microsoft/Swin-Transformer)       | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
+| [Google ViT](https://github.com/google-research/vision_transformer)     | Vision Transformer | TIMM              | 224x224    | ImageNet standard        |
+| [Dino V1](https://github.com/facebookresearch/dino)                     | Vision Transformer | TIMM            | 224x224    | ImageNet standard          |
+| [Yolo V11(Classification)](https://docs.ultralytics.com/models/yolo11/) | CNN                | TIMM              | 224x224    | ImageNet standard        |
+| [ConvNeXt-Base](https://github.com/facebookresearch/ConvNeXt)           | CNN                | TIMM              | 224x224    | ImageNet standard        |
 
 ## Training
 
@@ -105,32 +87,15 @@ Will train swin then dinov1 on GTSRB data.
   - Digital attacks targeting model gradients
   - FGSM: Single-step perturbation
   - PGD: Iterative refinement of FGSM
-- **Sign Area Constraint**: Applies perturbations only to sign regions
 ```
 python whitebox_attacks.py \
 --data_root ./path_to_top_of_dataset \
---model google_vit \
---source gtsrb \
---model_path ./results/vit/xxxx_best_model.pth \
+--models google_vit \
+--sources gtsrb \
+--model_base_path ./Models/ \
 --output_dir ./adv_attacks \
 ```
-### auto_attack.py
-- **Attack Type**: AutoAttack (Combination of 4 attacks)
-- **Characteristics**:
-  - State-of-the-art ensemble attack
-  - Parameter-free and adaptive
 
-Run prior:
-```pip install git+https://github.com/fra31/auto-attack```
-```
-python auto_attack.py \
---data_root ./path_to_top_of_dataset \
---model dinov1 \
---source gtsrb \
---model_path ./results/dinov1/xxxx_best_model.pth \
---output_dir ./adv_attacks \
---epsilon 0.05 \
---batch_size 16
 ```
 ### patch_attack.py
 - **Attack Type**: Physical adversarial patch
@@ -148,10 +113,12 @@ python patch_attack.py \
 --source lisa \
 --model_path ./results/swin/xxxx_best_model.pth \
 --output_dir ./adv_attacks \
+--batch_size 32 \
 --patch_size 32 \
 --patch_sample_size 100 \
 --scale_min 0.2 \
 --scale_max 0.8 \
+--patch_type circle square
 ```
 ### rp2_attack.py
 - **Attack Type**: Robust physical perturbation
@@ -162,6 +129,7 @@ python patch_attack.py \
 - **Parameters**:
   - `--sample_per_class`: Images per class for perturbation
 ```
+**In Dev**
 python rp2_attack.py \
 --data_root ./processed \
 --model swin \
@@ -173,7 +141,17 @@ python rp2_attack.py \
 ```
 ## LoRA Training
 
-
+python train_loras.py \
+--data_root ./path_to_data \
+--adv_root ./path_to_adv_data/ \
+--models swin \
+--sources mapillary \
+--model_base_path ./results/swin/best_model.pth \
+--output_dir ./loras \
+--batch_size 32 \
+--ranks 8 16 32 \
+--attacks patch_circle patch_square pgd fgsm
+```
 
 ## Composability
 TBD

@@ -155,6 +155,14 @@ python train_loras.py \
 ```
 
 ## Composability
-TBD
-
+    parser.add_argument('--model_path', required=True, help='Path to base fine-tuned model')
+    parser.add_argument('--lora_root', required=True, help='Root directory containing LoRA adapters')
+    parser.add_argument('--adv_root', required=True, help='Root directory for adversarial examples')
+    parser.add_argument('--data_root', required=True, help='Root directory for clean examples')
+    parser.add_argument('--attacks', nargs='+', required=True, help='List of attacks to evaluate')
+    parser.add_argument('--rank', type=int, required=True, help='Rank value to evaluate (e.g., 16)')
+    parser.add_argument('--output_file', default='test_results.json', help='Output JSON file for results')
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--test_mode', choices=['all', 'base_only', 'individual_only', 'combinations_only'],
+                        default='all', help='What to test: all, base_only, individual_only, or combinations_only')
 

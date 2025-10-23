@@ -8,10 +8,18 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
-import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score
-from Utils import TrafficSignDataset, create_model, get_normalization
+from Utils import TrafficSignDataset, create_vit_model, get_normalization
+
+
+def get_model_output(outputs):
+    if hasattr(outputs, 'logits'):
+        return outputs.logits
+    elif isinstance(outputs, dict) and 'logits' in outputs:
+        return outputs['logits']
+    else:
+        return outputs
 
 
 def train_epoch(model, dataloader, criterion, optimizer, device):
@@ -26,15 +34,14 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
         batch_size = inputs.size(0)
         total_samples += batch_size
 
-        if hasattr(model, 'visual') and hasattr(model.visual, 'conv1'):
-            inputs = inputs.to(model.visual.conv1.weight.dtype)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        logits = get_model_output(outputs)
+        loss = criterion(logits, labels)
         loss.backward()
         optimizer.step()
 
-        _, preds = torch.max(outputs, 1)
+        _, preds = torch.max(logits, 1)
         running_loss += loss.item() * batch_size
         running_corrects += torch.sum(preds == labels.data).item()
 
@@ -60,14 +67,12 @@ def validate(model, dataloader, criterion, device):
         batch_size = inputs.size(0)
         total_samples += batch_size
 
-        if hasattr(model, 'visual') and hasattr(model.visual, 'conv1'):
-            inputs = inputs.to(model.visual.conv1.weight.dtype)
-
         with torch.no_grad():
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            logits = get_model_output(outputs)
+            loss = criterion(logits, labels)
 
-        _, preds = torch.max(outputs, 1)
+        _, preds = torch.max(logits, 1)
         running_loss += loss.item() * batch_size
         running_corrects += torch.sum(preds == labels.data).item()
         all_preds.extend(preds.cpu().numpy())
@@ -91,13 +96,12 @@ def test(model, dataloader, device):
 
     for inputs, labels, _ in pbar:
         inputs, labels = inputs.to(device), labels.to(device)
-        if hasattr(model, 'visual') and hasattr(model.visual, 'conv1'):
-            inputs = inputs.to(model.visual.conv1.weight.dtype)
 
         with torch.no_grad():
             outputs = model(inputs)
+            logits = get_model_output(outputs)
 
-        _, preds = torch.max(outputs, 1)
+        _, preds = torch.max(logits, 1)
         all_preds.extend(preds.cpu().numpy())
         all_labels.extend(labels.cpu().numpy())
 
@@ -106,19 +110,18 @@ def test(model, dataloader, device):
     return acc, f1
 
 
-def train_model(model_name, args, selected_sources, device):
-    all_sources = ['gtsrb', 'lisa', 'roboflow', 'mapillary']
-    using_all_sources = set(selected_sources) == set(all_sources)
+def train_model(args, device):
+    model_name = 'google_vit'
+    source = args.source
 
-    if using_all_sources:
-        source_dir = 'unified'
-    else:
-        source_dir = '_'.join(sorted(selected_sources))
+    args.data_root = os.path.abspath(args.data_root)
+    args.output_dir = os.path.abspath(args.output_dir)
 
-    model_output_dir = os.path.join(args.output_dir, model_name, source_dir)
+    model_output_dir = os.path.join(args.output_dir, model_name, source)
     os.makedirs(model_output_dir, exist_ok=True)
-    print(f"\nTraining {model_name.upper()} model")
-    print(f"Saving outputs to: {model_output_dir}")
+
+    print(f"Training {model_name.upper()} on {source}")
+    print(f"Output directory: {model_output_dir}")
 
     mean, std = get_normalization(model_name)
 
@@ -138,41 +141,32 @@ def train_model(model_name, args, selected_sources, device):
         transforms.Normalize(mean, std)
     ])
 
-    if model_name.startswith('dinov3_'):
-        train_transform = transforms.Compose([
-            transforms.RandomRotation(15),
-            transforms.RandomResizedCrop(518),
-            transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(0.2, 0.2, 0.2),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ])
-        test_transform = transforms.Compose([
-            transforms.Resize(518),
-            transforms.CenterCrop(518),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ])
-
     def load_and_filter_split(split):
         meta_path = os.path.join(args.data_root, split, 'metadata.csv')
         if not os.path.exists(meta_path):
             return pd.DataFrame()
         df = pd.read_csv(meta_path)
-        return df[df['source'].isin(selected_sources)]
+        return df[df['source'] == source]
 
     train_meta = load_and_filter_split('train')
     val_meta = load_and_filter_split('val')
     test_meta = load_and_filter_split('test')
 
+    if train_meta.empty:
+        raise ValueError(f"No training data found for source: {source}")
+
     all_classes = set(train_meta['unified_class'].unique())
-    all_classes.update(val_meta['unified_class'].unique())
-    all_classes.update(test_meta['unified_class'].unique())
+    all_classes.update(val_meta['unified_class'].unique()) if not val_meta.empty else None
+    all_classes.update(test_meta['unified_class'].unique()) if not test_meta.empty else None
 
     class_to_idx = {cls: idx for idx, cls in enumerate(sorted(all_classes))}
-    print(f"Actual classes in {selected_sources}: {len(class_to_idx)}")
+    num_classes = len(class_to_idx)
+    print(f"Number of classes: {num_classes}")
 
-    def create_filtered_dataset(split, meta_df, transform):
+    def create_dataset(split, meta_df, transform):
+        if meta_df.empty:
+            return None
+
         temp_meta_path = os.path.join(model_output_dir, f'temp_{split}_metadata.csv')
         meta_df.to_csv(temp_meta_path, index=False)
 
@@ -183,34 +177,48 @@ def train_model(model_name, args, selected_sources, device):
             class_to_idx=class_to_idx
         )
 
-        os.remove(temp_meta_path)
+        try:
+            os.remove(temp_meta_path)
+        except:
+            pass
+
         return dataset
 
-    train_dataset = create_filtered_dataset('train', train_meta, train_transform)
-    val_dataset = create_filtered_dataset('val', val_meta, test_transform)
-    test_dataset = create_filtered_dataset('test', test_meta, test_transform)
+    train_dataset = create_dataset('train', train_meta, train_transform)
+    val_dataset = create_dataset('val', val_meta, test_transform) if not val_meta.empty else None
+    test_dataset = create_dataset('test', test_meta, test_transform) if not test_meta.empty else None
 
-    num_workers = min(4, os.cpu_count())
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
-                              shuffle=True, num_workers=num_workers, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size,
-                            shuffle=False, num_workers=num_workers, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size,
-                             shuffle=False, num_workers=num_workers, pin_memory=True)
+    if train_dataset is None:
+        raise ValueError("No training dataset created!")
 
-    print(f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}, Test={len(test_dataset)}")
-    print(f"Using normalization: mean={mean}, std={std}")
+    print(
+        f"Dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset) if val_dataset else 0}, Test={len(test_dataset) if test_dataset else 0}")
 
-    model = create_model(model_name, len(class_to_idx)).to(device)
+    print("Creating ViT model...")
+    model = create_vit_model(num_classes).to(device)
+
+    print("Model type:", type(model))
+
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
+    num_workers = min(4, os.cpu_count())
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
+                              shuffle=True, num_workers=num_workers, pin_memory=True)
+
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size,
+                            shuffle=False, num_workers=num_workers, pin_memory=True) if val_dataset else None
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size,
+                             shuffle=False, num_workers=num_workers, pin_memory=True) if test_dataset else None
+
+    # Save class mapping
     class_mapping_path = os.path.join(model_output_dir, 'class_mappings.txt')
     with open(class_mapping_path, 'w') as f:
         for cls_name, idx in class_to_idx.items():
             f.write(f"{idx}: {cls_name}\n")
 
+    # Training loop
     best_val_acc = 0.0
     history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': [], 'val_f1': []}
 
@@ -219,95 +227,91 @@ def train_model(model_name, args, selected_sources, device):
         print(f'\nEpoch {epoch + 1}/{args.epochs}')
 
         train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, val_acc, val_f1 = validate(model, val_loader, criterion, device)
+
+        if val_loader:
+            val_loss, val_acc, val_f1 = validate(model, val_loader, criterion, device)
+        else:
+            val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
+
         scheduler.step()
 
         history['train_loss'].append(train_loss)
         history['train_acc'].append(train_acc)
-        history['val_loss'].append(val_loss)
-        history['val_acc'].append(val_acc)
-        history['val_f1'].append(val_f1)
+        if val_loader:
+            history['val_loss'].append(val_loss)
+            history['val_acc'].append(val_acc)
+            history['val_f1'].append(val_f1)
 
         print(f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f}")
-        print(f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f} F1: {val_f1:.4f}")
+        if val_loader:
+            print(f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f} F1: {val_f1:.4f}")
 
-        if val_acc > best_val_acc:
+        if val_loader and val_acc > best_val_acc:
             best_val_acc = val_acc
             best_model_path = os.path.join(model_output_dir, f"{model_name}_best_model_finetuned.pth")
+
             torch.save(model.state_dict(), best_model_path)
-            print(f"New best model saved to: {best_model_path}")
+            print(f"✓ New best model saved to: {best_model_path}")
 
     training_time = time.time() - start_time
     print(f"\nTraining completed in {training_time // 60:.0f}m {training_time % 60:.0f}s")
 
     final_model_path = os.path.join(model_output_dir, f"{model_name}_final_model_finetuned.pth")
     torch.save(model.state_dict(), final_model_path)
-    print(f"Final model saved to: {final_model_path}")
+    print(f"✓ Final model saved to: {final_model_path}")
 
-    print("\nEvaluating best model on test set...")
-    best_model_path = os.path.join(model_output_dir, f"{model_name}_best_model_finetuned.pth")
-    model.load_state_dict(torch.load(best_model_path))
-    test_acc, test_f1 = test(model, test_loader, device)
-    print(f"Test Accuracy: {test_acc:.4f}, Test F1: {test_f1:.4f}")
+    if val_loader and test_loader:
+        print("\nEvaluating best model on test set...")
+        best_model_path = os.path.join(model_output_dir, f"{model_name}_best_model_finetuned.pth")
 
-    results_path = os.path.join(model_output_dir, 'results.csv')
-    results = {
-        'model': model_name,
-        'sources': ','.join(selected_sources),
-        'epochs': args.epochs,
-        'batch_size': args.batch_size,
-        'lr': args.lr,
-        'normalization_mean': mean,
-        'normalization_std': std,
-        'train_size': len(train_dataset),
-        'val_size': len(val_dataset),
-        'test_size': len(test_dataset),
-        'num_classes': len(class_to_idx),
-        'training_time': training_time,
-        'test_accuracy': test_acc,
-        'test_f1': test_f1,
-        'best_val_acc': best_val_acc
-    }
+        if os.path.exists(best_model_path):
+            model.load_state_dict(torch.load(best_model_path, map_location=device))
+            test_acc, test_f1 = test(model, test_loader, device)
+            print(f"Test Accuracy: {test_acc:.4f}, Test F1: {test_f1:.4f}")
+        else:
+            test_acc, test_f1 = 0.0, 0.0
+            print("Warning: Best model not found for testing")
+    else:
+        test_acc, test_f1 = 0.0, 0.0
 
+    results_path = os.path.join(model_output_dir, 'training_results.csv')
     with open(results_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['Metric', 'Value'])
+        results = {
+            'model': model_name,
+            'source': source,
+            'epochs': args.epochs,
+            'batch_size': args.batch_size,
+            'lr': args.lr,
+            'num_classes': num_classes,
+            'training_time': training_time,
+            'test_accuracy': test_acc,
+            'test_f1': test_f1,
+            'best_val_acc': best_val_acc if val_loader else 0.0
+        }
         for key, value in results.items():
             writer.writerow([key, value])
 
-    print(f"Training results saved to: {results_path}")
+    print(f"✓ Results saved to: {results_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Traffic Sign Recognition Training')
-    parser.add_argument('--data_root', default='./Datasets/Adjust_Global_Dataset', help='Root directory of unified dataset')
-    parser.add_argument('--model', required=True, nargs='+',
-                        choices=['dinov1', 'dinov3', 'swin', 'google_vit', 'convnext', 'yolov11'],
-                        help='Model architecture(s) to train')
-    parser.add_argument('--batch_size', type=int, default=64, help='Input batch size')
-    parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
-    parser.add_argument('--output_dir', default='./results', help='Output directory for results')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed')
-    parser.add_argument('--sources', default='all',
-                        help='Comma-separated list of sources to include (gtsrb,lisa,roboflow,mapillary) or "all"')
+    parser = argparse.ArgumentParser(description='Train ViT Model')
+    parser.add_argument('--data_root', required=True, help='Root directory of dataset')
+    parser.add_argument('--output_dir', default='./base_models', help='Output directory')
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--source', default='mapillary', help='Source dataset')
+
     args = parser.parse_args()
 
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
-    if args.sources.lower() == 'all':
-        selected_sources = ['gtsrb', 'lisa', 'roboflow', 'mapillary']
-    else:
-        selected_sources = [s.strip() for s in args.sources.split(',')]
-    print(f"Using data from sources: {', '.join(selected_sources)}")
-
-    for model_name in args.model:
-        train_model(model_name, args, selected_sources, device)
+    train_model(args, device)
 
 
 if __name__ == '__main__':
     main()
-
